@@ -218,3 +218,36 @@ Threads are created to sort left and right half of the array. Structs are passed
 ## Conclusions 
 
 The normal quick sort runs the fastest due to no overheads of creating processes and threads. Threads quick sort runs faster than process quick sort as creating new processes with different stacks etc requires more time and has more overhead. 
+
+### For n = 10
+
+Time taken by Normal QuickSort = 0.000116
+Time taken by Concurrent QuickSort = 0.036541
+Time taken by Threaded Concurrent QuickSort = 0.005083
+
+Normal QuickSort is :
+
+314.276294 times faster than Concurrent QuickSort
+43.715032 times faster than Threaded Concurrent QuickSort
+
+### For n = 100
+
+Time taken by Normal QuickSort = 0.000130
+Time taken by Concurrent QuickSort = 0.008321
+Time taken by Threaded Concurrent QuickSort = 0.008319
+
+Normal QuickSort is :
+
+63.869440 times faster than Concurrent QuickSort
+63.854496 times faster than Threaded Concurrent QuickSort
+
+### For n = 1000
+
+Time taken by Normal QuickSort = 0.004970
+Time taken by Concurrent QuickSort = 15.282341
+Time taken by Threaded Concurrent QuickSort = 0.098592
+
+Normal QuickSort is :
+
+3074.883728 times faster than Concurrent QuickSort
+19.837208 times faster than Threaded Concurrent QuickSort
