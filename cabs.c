@@ -31,6 +31,7 @@ struct Rider
 	int cabType;
 	int maxWaitTime;
 	int RideTime;
+	int cab_no;
 };
 
 void * rider_thread(void* args);
@@ -45,18 +46,27 @@ int main()
 	// sem_init(&cabs, 0, no_cabs);
 	//sem_init(&pool_cabs, 0, no_cabs); 
 	sem_init(&servers, 0, no_servers); 
+
+
 	pthread_mutex_init(&mutex, NULL);
 
+	for(int i=0; i< no_cabs; i++)
+	{
+		Cabs[i].type = 0;
+		Cabs[i].status = 0;
+		pthread_mutex_init(&(Cabs[i].cab_mutex), NULL);
+	}
+
+	//printf("Enter Arrival time, cab type, max waiting time, Ride time\n");
 	for(int i=0; i < no_riders; i++)
 	{
 		riders[i].idx = i+1; 	
-		// riders[i].arrivalTime = rand()%3; 
-		// riders[i].cabType = rand()%2+1;
-		// riders[i].maxWaitTime = rand()%10;
-		// riders[i].RideTime = rand()%15;
-		printf("Enter Arrival time, cab type, max waiting time, Ride time\n");
-		scanf("%d %d %d %d",&riders[i].arrivalTime, &riders[i].cabType,&riders[i].maxWaitTime, &riders[i].RideTime);
-		riders[i].maxWaitTime = 0;
+		riders[i].arrivalTime = rand()%3; 
+		riders[i].cabType = rand()%2+1;
+		riders[i].maxWaitTime = rand()%10;
+		riders[i].RideTime = rand()%15;
+		
+		//scanf("%d %d %d %d",&riders[i].arrivalTime, &riders[i].cabType,&riders[i].maxWaitTime, &riders[i].RideTime);
 		// printf("%d. %d\n\n", riders[i].idx,riders[i].arrivalTime);
 		//pthread_create(&(riders[i].rider_thread_id), NULL, rider_thread , &riders[i]);
 	}
@@ -71,7 +81,10 @@ int main()
 		pthread_join(riders[i].rider_thread_id, 0);
 	}
 
-	pthread_mutex_destroy(&mutex);
+	// pthread_mutex_destroy(&mutex);
+	for(int i=0; i< no_cabs; i++)
+		pthread_mutex_destroy(&(Cabs[i].cab_mutex));
+	
 	free(riders);
 	return 0;
 }
@@ -89,7 +102,7 @@ void * rider_thread(void* args)
 {
 	Rider * rider = (Rider*)args;
 	sleep(rider ->arrivalTime);
-	printf("\n\n\x1B[33;1mRider %d \x1B[0mhas arrived with details:\x1B[33;1m\nCab type - %d\nMax Wait Time %d\nRide Time %d\n\n\x1B[0m", rider->idx, rider->cabType, rider->maxWaitTime, rider->RideTime);
+	printf("\n\n\x1B[33;1mRider %d \x1B[0mhas arrived with details:\n\x1B[33;1mArrival time - %d\nCab type - %d\nMax Wait Time %d\nRide Time %d\n\n\x1B[0m", rider->idx, rider->arrivalTime,rider->cabType, rider->maxWaitTime, rider->RideTime);
 	int got_ride = 0, time_exceed = 0;
 
 	clock_t t = clock();
@@ -98,8 +111,10 @@ void * rider_thread(void* args)
 	{
 		clock_t time_taken = clock() - t;
 		double times = ((double)time_taken)/CLOCKS_PER_SEC;
-		if(times > rider->maxWaitTime)
+		if(times > ((double)rider->maxWaitTime))
 		{
+			printf("Time %f\n",times );
+			printf("%d\n",rider->maxWaitTime);
 			time_exceed = 1; 
 			break;
 		}
@@ -113,18 +128,26 @@ void * rider_thread(void* args)
 			{
 				if(Cabs[i].type == 0)
 				{
+					//printf("1");
 					Cabs[i].type = 1;
 					got_ride = 1;
+					rider->cab_no = i+1;
+					pthread_mutex_unlock(&(Cabs[i].cab_mutex));
+					break;
 				}
 			}
 
 			else if(rider->cabType == 2)
 			{
-				if(Cabs[i].type == 1)
+				if(Cabs[i].type == 2 && Cabs[i].status == 1)
 				{
+					//printf("2");
 					Cabs[i].status = 2;
 					flag = 1;
 					got_ride = 1;
+					rider->cab_no = i+1;
+					pthread_mutex_unlock(&(Cabs[i].cab_mutex));
+					break;
 				}
 			}
 			
@@ -137,15 +160,16 @@ void * rider_thread(void* args)
 			{
 				pthread_mutex_lock(&(Cabs[i].cab_mutex));
 				
-				if(rider->cabType == 1)
+				if(Cabs[i].type == 0)
 				{
-					if(Cabs[i].type == 0)
-					{
-						Cabs[i].type = 2;
-						Cabs[i].status = 1;
-						got_ride = 1;
-					}
+					Cabs[i].type = 2;
+					Cabs[i].status = 1;
+					got_ride = 1;
+					rider->cab_no = i+1;
+					pthread_mutex_unlock(&(Cabs[i].cab_mutex));
+					break;
 				}
+			
 				
 				pthread_mutex_unlock(&(Cabs[i].cab_mutex));
 			}
@@ -159,12 +183,30 @@ void * rider_thread(void* args)
 	}
 	
 	if(rider->cabType == 1)
-		printf("\x1B[1;34mRider %d has boarded premier cab!\x1B[0m\n\n",rider->idx);
-	else printf("\x1B[1;34mRider %d has boarded pool cab!\x1B[0m\n\n",rider->idx);
+		printf("\x1B[1;34mRider %d has boarded premier cab %d!\x1B[0m\n\n",rider->idx, rider->cab_no);
+
+	else printf("\x1B[1;34mRider %d has boarded pool cab %d!\x1B[0m\n\n",rider->idx, rider->cab_no);
 	
 
 	sleep(rider->RideTime);
-	printf("\x1B[35;3mRider %d has finished journey!\x1B[0m\n\n",rider->idx);
+
+	int no = rider->cab_no-1;
+	pthread_mutex_lock(&(Cabs[no].cab_mutex));
+	if(rider->cabType == 2)
+	{
+		if(Cabs[no].status==1)
+		{
+			Cabs[no].type = 0;
+			Cabs[no].status = 0;
+		}
+
+		else Cabs[no].status = 1;
+	}
+
+	else Cabs[no].type = 0;
+	printf("\x1B[35;3mRider %d has finished journey with cab %d!\x1B[0m\n\n",rider->idx, rider->cab_no);
+	pthread_mutex_unlock(&(Cabs[no].cab_mutex));
+	
 	payment(rider->idx);
 
 	return NULL;
