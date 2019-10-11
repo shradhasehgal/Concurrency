@@ -8,8 +8,7 @@
 typedef struct Cab Cab;
 typedef struct Rider Rider;
 //sem_t cabs;
-sem_t servers;
-
+sem_t riders_ready_topay;
 pthread_mutex_t mutex;
 
 
@@ -19,10 +18,6 @@ struct Cab
 	int status;
 	pthread_mutex_t cab_mutex;
 };
-
-Cab Cabs[1000];
-int no_cabs,no_riders,no_servers;
-pthread_mutex_t pay_servers[1000];
 
 struct Rider
 {
@@ -35,6 +30,15 @@ struct Rider
 	int cab_no;
 };
 
+struct server
+{
+	int idx;
+	pthread_t server_thread_id;
+}
+
+Cab Cabs[1000]; Rider riders[1000], Server servers[1000];
+int no_cabs,no_riders,no_servers;
+
 void * rider_thread(void* args);
 
 int main()
@@ -42,14 +46,14 @@ int main()
 	printf("Enter number of cabs, riders, and payment servers:\n");
 	scanf("%d %d %d", &no_cabs, &no_riders, &no_servers);
 
-	Rider *riders = malloc((no_riders+2) * sizeof(Rider));
+	// Rider *riders = malloc((no_riders+2) * sizeof(Rider));
 	srand(time(0));
 	// sem_init(&cabs, 0, no_cabs);
 	//sem_init(&pool_cabs, 0, no_cabs); 
-	sem_init(&servers, 0, no_servers); 
+	sem_init(&riders_ready_topay, 0, 0); 
 
 
-	pthread_mutex_init(&mutex, NULL);
+	// pthread_mutex_init(&mutex, NULL);
 
 	for(int i=0; i< no_cabs; i++)
 	{
@@ -73,31 +77,30 @@ int main()
 	}
 
 	for(int i=0; i < no_riders; i++)
-	{
 		pthread_create(&(riders[i].rider_thread_id), NULL, rider_thread , &riders[i]);
-	}
+
+	for(int i=0; i < no_servers; i++)
+		pthread_create(&(riders[i].rider_thread_id), NULL, rider_thread , &riders[i]);
 
 	for(int i=0; i < no_riders; i++)
-	{
 		pthread_join(riders[i].rider_thread_id, 0);
-	}
 
 	// pthread_mutex_destroy(&mutex);
 	for(int i=0; i< no_cabs; i++)
 		pthread_mutex_destroy(&(Cabs[i].cab_mutex));
 	
-	free(riders);
+	
 	return 0;
 }
 
-void payment(int idx)
-{
-	sem_wait(&servers); //sem_wait(&pool_cabs);
-	sleep(2);
-	printf("\x1B[1;32mRider %d has done the payment!\n\n\x1B[0m", idx);
-	sem_post(&servers);
-	return;
-}
+// void payment(int idx)
+// {
+// 	sem_wait(&servers); //sem_wait(&pool_cabs);
+// 	sleep(2);
+// 	printf("\x1B[1;32mRider %d has done the payment!\n\n\x1B[0m", idx);
+// 	sem_post(&servers);
+// 	return;
+// }
 
 void * rider_thread(void* args)
 {
@@ -208,7 +211,7 @@ void * rider_thread(void* args)
 	printf("\x1B[35;3mRider %d has finished journey with cab %d!\x1B[0m\n\n",rider->idx, rider->cab_no);
 	pthread_mutex_unlock(&(Cabs[no].cab_mutex));
 	
-	payment(rider->idx);
+	//payment(rider->idx);
 
 	return NULL;
 }
