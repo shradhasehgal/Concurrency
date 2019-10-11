@@ -93,8 +93,9 @@ int main()
 void payment(int idx)
 {
 	sem_wait(&servers); //sem_wait(&pool_cabs);
+	printf("\x1B[32mRIDER %d PAYING\n\x1B[0m", idx);
 	sleep(2);
-	printf("\x1B[1;32mRider %d has done the payment!\n\n\x1B[0m", idx);
+	printf("\x1B[1;32mRIDER %d DONE!\n\x1B[0m", idx);
 	sem_post(&servers);
 	return;
 }
@@ -114,8 +115,8 @@ void * rider_thread(void* args)
 		double times = ((double)time_taken)/CLOCKS_PER_SEC;
 		if(times > ((double)rider->maxWaitTime))
 		{
-			printf("Time %f\n",times );
-			printf("%d\n",rider->maxWaitTime);
+			// printf("Time %f\n",times );
+			// printf("%d\n",rider->maxWaitTime);
 			time_exceed = 1; 
 			break;
 		}
@@ -179,14 +180,14 @@ void * rider_thread(void* args)
 	
 	if(time_exceed == 1)
 	{
-		printf("\e[31;1mRider %d has left the system as Max Waiting time was exceeded!\x1B[0m\n\n",rider->idx);
+		printf("\e[31;1m TIMEOUT FOR RIDER %d!\x1B[0m\n",rider->idx);
 		return NULL;
 	}
 	
 	if(rider->cabType == 1)
-		printf("\x1B[1;34mRider %d has boarded premier cab %d!\x1B[0m\n\n",rider->idx, rider->cab_no);
+		printf("\x1B[1;34mRIDER %d HAS BOARDED PREMIER CAB %d!\x1B[0m\n",rider->idx, rider->cab_no);
 
-	else printf("\x1B[1;34mRider %d has boarded pool cab %d!\x1B[0m\n\n",rider->idx, rider->cab_no);
+	else printf("\x1B[1;34mRIDER %d HAS BOARDED POOL CAB %d!\x1B[0m\n",rider->idx, rider->cab_no);
 	
 
 	sleep(rider->RideTime);
@@ -205,7 +206,7 @@ void * rider_thread(void* args)
 	}
 
 	else Cabs[no].type = 0;
-	printf("\x1B[35;3mRider %d has finished journey with cab %d!\x1B[0m\n\n",rider->idx, rider->cab_no);
+	printf("\x1B[35;3mRIDER %d HAS FINISHED JOURNEY WITH CAB %d!\x1B[0m\n",rider->idx, rider->cab_no);
 	pthread_mutex_unlock(&(Cabs[no].cab_mutex));
 	
 	payment(rider->idx);

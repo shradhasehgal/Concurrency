@@ -56,7 +56,7 @@ int main()
 	printf("Enter number of cabs, riders, and payment servers:\n");
 	scanf("%d %d %d", &no_cabs, &no_riders, &no_servers);
 
-	// Rider *riders = malloc((no_riders+2) * sizeof(Rider));
+	// Rider *riders; = malloc((no_riders+2) * sizeof(Rider));
 	srand(time(0));
 	// sem_init(&cabs, 0, no_cabs);
 	//sem_init(&pool_cabs, 0, no_cabs); 
@@ -76,16 +76,14 @@ int main()
 	for(int i=0; i < no_riders; i++)
 	{
 		riders[i].idx = i+1; 	
-		// riders[i].arrivalTime = rand()%3; 
-		// riders[i].cabType = rand()%2+1;
-		// riders[i].maxWaitTime = rand()%10;
-		// riders[i].RideTime = rand()%15;
+		riders[i].arrivalTime = rand()%3; 
+		riders[i].cabType = rand()%2+1;
+		riders[i].maxWaitTime = rand()%10;
+		riders[i].RideTime = rand()%15;
 		sem_init(&(riders[i].payment), 0, 0); 
 		riders[i].status = 0;
 		pthread_mutex_init(&(riders[i].rider_mutex), NULL);
-		scanf("%d %d %d %d",&riders[i].arrivalTime, &riders[i].cabType,&riders[i].maxWaitTime, &riders[i].RideTime);
-		// printf("%d. %d\n\n", riders[i].idx,riders[i].arrivalTime);
-		//pthread_create(&(riders[i].rider_thread_id), NULL, rider_thread , &riders[i]);
+		//scanf("%d %d %d %d",&riders[i].arrivalTime, &riders[i].cabType,&riders[i].maxWaitTime, &riders[i].RideTime);
 	}
 
 	for(int i=0; i < no_servers; i++)
@@ -270,4 +268,6 @@ void * server_thread(void* args)
 			server->status = FREE;
 		}
 	}
+	
+	return NULL;
 }
