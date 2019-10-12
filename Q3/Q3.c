@@ -5,276 +5,269 @@
 #include <unistd.h>
 #include <semaphore.h>
 
+typedef struct Cab Cab;
+typedef struct Rider Rider;
+typedef struct Server Server;
+//sem_t cabs;
+#define BUSY 1
+#define FREE 0
 
-#define KNRM  "\x1B[1;0m"
-#define KRED  "\x1B[1;31m"
-#define KGRN  "\x1B[1;32m"
-#define KYEL  "\x1B[1;33m"
-#define KBLU  "\x1B[1;34m"
-#define KMAG  "\x1B[1;35m"
-#define KCYN  "\x1B[1;36m"
-#define KWHT  "\x1B[1;37m"
-#define KGR "\x1B[1;32m"
+sem_t riders_ready_topay;
+pthread_mutex_t mutex;
 
-int no_chefs, no_students, no_tables;
 
-typedef struct Chef Chef;
-typedef struct Table Table;
-typedef struct Student Student;
-pthread_mutex_t waiting_mutex;
+struct Cab
+{
+	int type;
+	int status;
+	pthread_mutex_t cab_mutex;
+};
 
-struct Chef
+struct Rider
+{
+	int idx;
+	int arrivalTime;
+	int cabType;
+	int maxWaitTime;
+	int RideTime;
+	int cab_no;
+	int status;
+	sem_t payment;
+	pthread_t rider_thread_id;
+	pthread_mutex_t rider_mutex;
+};
+
+struct Server
 {
 	int idx;
 	int status;
-    int vessels_left;
-    int capacity;
-	pthread_mutex_t chef_mutex;
-    pthread_t chef_thread_id;
-    pthread_cond_t cv_table; 
+	int rider_no;
+	pthread_t server_thread_id;
 };
 
-struct Table
-{
-    int idx;
-    int capacity;
-    int slots;
-    int occupancy;
-    pthread_mutex_t table_mutex;
-    pthread_t table_thread_id;
-    pthread_cond_t cv_student;
-};
+Cab Cabs[1000]; Rider riders[1000]; Server servers[1000];
+int no_cabs,no_riders,no_servers;
 
-struct Student
-{
-    int idx;
-    pthread_mutex_t student_mutex;
-    pthread_t student_thread_id;
-};
-
-Chef chefs[1000]; Table tables[1000]; Student students[1000]; 
-int waiting_students;
-
-void * chef_thread(void* args);
-void * table_thread(void* args);
-void * student_thread(void* args);
-void biryani_ready(Chef *chef);
-void ready_to_serve_table(Table *table);
-void wait_for_slot(int idx);
-void student_in_slot(int i, int idx);
+void * rider_thread(void* args);
+void * server_thread(void* args);
 
 int main()
 {
-    srand(time(0));
-    printf("Enter number of chefs, tables, and students:\n");
-    scanf("%d %d %d", &no_chefs, &no_tables, &no_students);
+	printf("Enter number of cabs, riders, and payment servers:\n");
+	scanf("%d %d %d", &no_cabs, &no_riders, &no_servers);
 
-    waiting_students = 0;
-    for(int i=0; i < no_chefs; i++)
-    {
-        chefs[i].idx = i+1;
-        pthread_mutex_init(&(chefs[i].chef_mutex), NULL);
-    }   
+	// Rider *riders; = malloc((no_riders+2) * sizeof(Rider));
+	srand(time(0));
+	// sem_init(&cabs, 0, no_cabs);
+	//sem_init(&pool_cabs, 0, no_cabs); 
+	sem_init(&riders_ready_topay, 0, 0); 
 
-    for(int i=0; i < no_tables; i++)
-    {
-        tables[i].idx = i+1;
-        pthread_mutex_init(&(chefs[i].chef_mutex), NULL);
-    }  
 
-    for(int i=0; i < no_students; i++)
-    {
-        students[i].idx = i+1;
-        pthread_mutex_init(&(chefs[i].chef_mutex), NULL);
-    }
+	// pthread_mutex_init(&mutex, NULL);
 
-    printf("%sBeginning Simulation\n\n",KGR);
+	for(int i=0; i< no_cabs; i++)
+	{
+		Cabs[i].type = 0;
+		Cabs[i].status = 0;
+		pthread_mutex_init(&(Cabs[i].cab_mutex), NULL);
+	}
 
-    for(int i=0; i < no_chefs; i++)
-		pthread_create(&(chefs[i].chef_thread_id), NULL, chef_thread , &chefs[i]);
+	//printf("Enter Arrival time, cab type, max waiting time, Ride time\n");
+	for(int i=0; i < no_riders; i++)
+	{
+		riders[i].idx = i+1; 	
+		riders[i].arrivalTime = rand()%3; 
+		riders[i].cabType = rand()%2+1;
+		riders[i].maxWaitTime = rand()%7 +1;
+		riders[i].RideTime = rand()%10;
+		sem_init(&(riders[i].payment), 0, 0); 
+		riders[i].status = 0;
+		pthread_mutex_init(&(riders[i].rider_mutex), NULL);
+		//scanf("%d %d %d %d",&riders[i].arrivalTime, &riders[i].cabType,&riders[i].maxWaitTime, &riders[i].RideTime);
+	}
 
-	for(int i=0; i < no_tables; i++)
-		pthread_create(&(tables[i].table_thread_id), NULL, table_thread , &tables[i]);
+	for(int i=0; i < no_servers; i++)
+	{
+		servers[i].status = FREE;
+		servers[i].idx = i+1;
+		servers[i].rider_no = 0;
+	}
 
-    for(int i=0; i < no_students; i++)
-		pthread_create(&(students[i].student_thread_id), NULL, student_thread , &students[i]);
+	for(int i=0; i < no_servers; i++)
+		pthread_create(&(servers[i].server_thread_id), NULL, server_thread , &servers[i]);
 
-	for(int i=0; i < no_students; i++)
-		pthread_join(students[i].student_thread_id, 0);  
+	for(int i=0; i < no_riders; i++)
+		pthread_create(&(riders[i].rider_thread_id), NULL, rider_thread , &riders[i]);
 
-    for(int i=0; i < no_tables; i++)
-        pthread_cancel(tables[i].table_thread_id);
 
-    for(int i=0; i< no_chefs; i++)
-		pthread_mutex_destroy(&(chefs[i].chef_mutex));
-    
-    for(int i=0; i < no_tables; i++)
-		pthread_mutex_destroy(&(tables[i].table_mutex));
+	for(int i=0; i < no_riders; i++)
+		pthread_join(riders[i].rider_thread_id, 0);
 
-    printf("\n%sSimulation over!\n", KGR);
-	return 0; 
+	// pthread_mutex_destroy(&mutex);
+	for(int i=0; i< no_cabs; i++)
+		pthread_mutex_destroy(&(Cabs[i].cab_mutex));
+	
+	
+	return 0;
 }
 
-void * chef_thread(void* args)
-{
-	Chef * chef = (Chef*)args;
-    
-    while(1)
-    {
-        int r = rand()%10 + 1;
-        printf("%sCHEF %d PREPARING %d VESSELS\n",KRED, chef->idx, r);
-        int w = rand()%4 + 2;
-        sleep(w);
-        pthread_mutex_lock(&(chef -> chef_mutex));
-        chef->vessels_left = r;
-        chef->capacity = rand()%6 + 20;
-        printf("%sCHEF %d HAS PREPARED %d VESSELS WITH CAPACITY %d\n",KRED, chef->idx, chef->vessels_left, chef->capacity);        
-        biryani_ready(chef);
-    }
+// void payment(int idx)
+// {
+// 	sem_wait(&servers); //sem_wait(&pool_cabs);
+// 	sleep(2);
+// 	printf("\x1B[1;32mRider %d has done the payment!\n\n\x1B[0m", idx);
+// 	sem_post(&servers);
+// 	return;
+// }
 
-    return NULL;
+void * rider_thread(void* args)
+{
+	Rider * rider = (Rider*)args;
+	sleep(rider ->arrivalTime);
+	printf("\n\n\x1B[33;1mRider %d \x1B[0mhas arrived with details:\n\x1B[33;1mArrival time - %d\nCab type - %d\nMax Wait Time %d\nRide Time %d\n\n\x1B[0m", rider->idx, rider->arrivalTime,rider->cabType, rider->maxWaitTime, rider->RideTime);
+	int got_ride = 0, time_exceed = 0;
+
+	clock_t t = clock();
+	
+	while(!got_ride)
+	{
+		clock_t time_taken = clock() - t;
+		double times = ((double)time_taken)/CLOCKS_PER_SEC;
+		if(times > ((double)rider->maxWaitTime))
+		{
+			// printf("Time %f\n",times );
+			// printf("%d\n",rider->maxWaitTime);
+			time_exceed = 1; 
+			break;
+		}
+
+		int flag = 0;
+		for(int i=0; i < no_cabs; i++)
+		{
+			pthread_mutex_lock(&(Cabs[i].cab_mutex));
+			
+			if(rider->cabType == 1)
+			{
+				if(Cabs[i].type == 0)
+				{
+					//printf("1");
+					Cabs[i].type = 1;
+					got_ride = 1;
+					rider->cab_no = i+1;
+					pthread_mutex_unlock(&(Cabs[i].cab_mutex));
+					break;
+				}
+			}
+
+			else if(rider->cabType == 2)
+			{
+				if(Cabs[i].type == 2 && Cabs[i].status == 1)
+				{
+					//printf("2");
+					Cabs[i].status = 2;
+					flag = 1;
+					got_ride = 1;
+					rider->cab_no = i+1;
+					pthread_mutex_unlock(&(Cabs[i].cab_mutex));
+					break;
+				}
+			}
+			
+			pthread_mutex_unlock(&(Cabs[i].cab_mutex));
+		}
+
+		if(rider->cabType == 2 && flag == 0)
+		{
+			for(int i=0; i < no_cabs; i++)
+			{
+				pthread_mutex_lock(&(Cabs[i].cab_mutex));
+				
+				if(Cabs[i].type == 0)
+				{
+					Cabs[i].type = 2;
+					Cabs[i].status = 1;
+					got_ride = 1;
+					rider->cab_no = i+1;
+					pthread_mutex_unlock(&(Cabs[i].cab_mutex));
+					break;
+				}
+			
+				
+				pthread_mutex_unlock(&(Cabs[i].cab_mutex));
+			}
+		}
+	}
+	
+	if(time_exceed == 1)
+	{
+		printf("\e[31;1mTIMEOUT FOR RIDER %d!\x1B[0m\n",rider->idx);
+		return NULL;
+	}
+	
+	if(rider->cabType == 1)
+		printf("\x1B[1;34mRIDER %d HAS BOARDED PREMIER CAB  %d\x1B[0m\n",rider->idx, rider->cab_no);
+
+	else printf("\x1B[1;34mRIDER %d HAS BOARDED POOL CAB %d\x1B[0m\n",rider->idx, rider->cab_no);
+	
+
+	sleep(rider->RideTime);
+
+	int no = rider->cab_no-1;
+	pthread_mutex_lock(&(Cabs[no].cab_mutex));
+	if(rider->cabType == 2)
+	{
+		if(Cabs[no].status==1)
+		{
+			Cabs[no].type = 0;
+			Cabs[no].status = 0;
+		}
+
+		else Cabs[no].status = 1;
+	}
+
+	else Cabs[no].type = 0;
+	printf("\x1B[35;3mRIDER %d FINISHED JOURNEY WITH CAB %d!\x1B[0m\n",rider->idx, rider->cab_no);
+	rider->status = 1;
+	sem_post(&riders_ready_topay);
+	pthread_mutex_unlock(&(Cabs[no].cab_mutex));
+	
+	sem_wait(&(rider->payment));
+
+	return NULL;
 }
 
-void biryani_ready(Chef *chef)
+void * server_thread(void* args)
 {
-    while(1)
-    {
-        if(chef -> vessels_left == 0)
-        {
-            break;
-        }
-        else pthread_cond_wait(&(chef->cv_table), &(chef->chef_mutex));
-    }
+	Server * server = (Server*)args;
+	while(1)
+	{
+		sem_wait(&riders_ready_topay);
+		server->status = BUSY;
+		// int sl = 0;
+		for(int i=0; i < no_riders; i++)
+		{
+			pthread_mutex_lock(&(riders[i].rider_mutex));
+			if(riders[i].status == 1)
+			{
+				server->rider_no = i+1;
+				printf("\x1B[32mRIDER %d PAYING ON SERVER %d\x1B[0m\n", i+1, server->idx);
+				riders[i].status = 0;
+				pthread_mutex_unlock(&(riders[i].rider_mutex));
+				break;
+			}
 
-    printf("%sALL VESSELS PREPARED BY CHEF %d ARE EMPTY, RESUMING COOKING NOW\n",KYEL,chef->idx);
-    pthread_mutex_unlock(&(chef -> chef_mutex));
-    //printf("%sCHEF %d RESUMING COOKING AS ALL VESSELS EMPTIED\n",KNRM ,chef->idx);
-}
+			pthread_mutex_unlock(&(riders[i].rider_mutex));
+		}
 
-void * table_thread(void* args)
-{
-    Table * table = (Table*)args;
-    
-    while(1)
-    {
-        int fluff = 0;
-        for(int i=0; i < no_chefs; i++)
-        {
-            pthread_mutex_lock(&(chefs[i].chef_mutex));
-            if(chefs[i].vessels_left > 0)
-            {
-                fluff = 1;
-                table -> capacity = chefs[i].capacity;
-                chefs[i].vessels_left--;
-                printf("%sTABLE %d HAS RECEIVED VESSEL FROM CHEF %d\n", KCYN,table->idx, i+1);
-                pthread_cond_signal(&(chefs[i].cv_table));
-                pthread_mutex_unlock(&(chefs[i].chef_mutex));
-                break;
-            }
-
-            pthread_cond_signal(&(chefs[i].cv_table));
-            pthread_mutex_unlock(&(chefs[i].chef_mutex));
-        }
-
-        while(fluff)
-        {
-            pthread_mutex_lock(&(table->table_mutex));
-            
-            if(table->capacity == 0)
-            {
-                printf("%sSERVING CONTAINER AT TABLE %d EMPTY, WAITING FOR REFILL\n",KRED, table->idx);
-                pthread_mutex_unlock(&(table->table_mutex));
-                break;
-            }
-            
-            table -> slots = rand() % 10 + 1;
-            table -> occupancy = 0;
-
-            if(table -> slots > table -> capacity)
-                table-> slots = table -> capacity;
-
-            table -> capacity -= table->slots;
-            printf("%sTABLE %d READY TO SERVE WITH %d SLOTS\n",KMAG,table->idx, table->slots);
-            ready_to_serve_table(table);
-        }
-        
-    }
-
-    return NULL;
-}
-
-void ready_to_serve_table(Table *table)
-{
-    while(1)
-    {
-        pthread_mutex_lock(&(waiting_mutex));
-        if(waiting_students == 0)
-        {
-            printf("%sNO WAITING STUDENTS CURRENTLY, TABLE %d SLOTS EMPTIED\n",KYEL,table->idx);
-            pthread_mutex_unlock(&(waiting_mutex));
-            
-            break;
-        }
-
-        pthread_mutex_unlock(&(waiting_mutex));
-
-        if(table -> slots == table -> occupancy)
-        {
-            printf("%sALL SLOTS FILLED FOR TABLE %d, RECHECKING CAPACITY\n",KCYN,table->idx);
-            break;
-        }
-
-        else pthread_cond_wait(&(table-> cv_student), &(table-> table_mutex));
-    }
-
-    pthread_mutex_unlock(&(table -> table_mutex));
-}
-
-void * student_thread(void* args)
-{
-    Student * student = (Student*)args;
-    int arrival_time = rand()%10;
-    sleep(arrival_time);
-    pthread_mutex_lock(&(waiting_mutex));
-    waiting_students++;
-    pthread_mutex_unlock(&(waiting_mutex));
-    printf("%sSTUDENT %d HAS ARRIVED AND IS WAITING FOR SLOT\n",KYEL,student->idx);
-    wait_for_slot(student->idx);
-    return NULL;
-}
-
-void wait_for_slot(int idx)
-{
-    int got_table =0;
-    while(!got_table)
-    {
-        for(int i=0; i < no_tables; i++)
-        {
-            pthread_mutex_lock(&(tables[i].table_mutex));
-            if(tables[i].slots - tables[i].occupancy > 0)
-            {
-                tables[i].occupancy++;
-                got_table = 1;
-                student_in_slot(i, idx);
-                break;
-            }
-
-            pthread_cond_signal(&(tables[i].cv_student));
-            pthread_mutex_unlock(&(tables[i].table_mutex));
-        }
-    }
-
-    return;
-}
-
-void student_in_slot(int i, int idx)
-{
-    pthread_mutex_lock(&(waiting_mutex));
-    waiting_students--;
-    pthread_mutex_unlock(&(waiting_mutex));
-    printf("%sSTUDENT %d WAITING FOR SLOT AT TABLE %d\n",KRED,idx, i+1);
-    printf("%sSTUDENT %d EATING AT TABLE %d\n",KGRN,idx, i+1);
-    pthread_cond_signal(&(tables[i].cv_student));
-    pthread_mutex_unlock(&(tables[i].table_mutex));
-    return;
+		if(server->rider_no)
+		{
+			sleep(2);
+			printf("\x1B[1;32mRIDER %d DONE!\x1B[0m\n",server->rider_no);
+			sem_post(&(riders[server->rider_no - 1].payment));
+			server->rider_no = 0;
+			server->status = FREE;
+		}
+	}
+	
+	return NULL;
 }
