@@ -21,6 +21,7 @@ int no_chefs, no_students, no_tables;
 typedef struct Chef Chef;
 typedef struct Table Table;
 typedef struct Student Student;
+pthread_mutex_t waiting_mutex;
 
 struct Chef
 {
@@ -52,6 +53,7 @@ struct Student
 };
 
 Chef chefs[1000]; Table tables[1000]; Student students[1000]; 
+int waiting_students;
 
 void * chef_thread(void* args);
 void * table_thread(void* args);
@@ -66,7 +68,8 @@ int main()
     srand(time(0));
     printf("Enter number of chefs, tables, and students:\n");
     scanf("%d %d %d", &no_chefs, &no_tables, &no_students);
-    
+
+    waiting_students = 0;
     for(int i=0; i < no_chefs; i++)
     {
         chefs[i].idx = i+1;
@@ -210,6 +213,17 @@ void ready_to_serve_table(Table *table)
 {
     while(1)
     {
+        pthread_mutex_lock(&(waiting_mutex));
+        if(waiting_students == 0)
+        {
+            printf("%sNO WAITING STUDENTS CURRENTLY, TABLE %d SLOTS EMPTIED\n",KYEL,table->idx);
+            pthread_mutex_unlock(&(waiting_mutex));
+            
+            break;
+        }
+
+        pthread_mutex_unlock(&(waiting_mutex));
+
         if(table -> slots == table -> occupancy)
         {
             printf("%sALL SLOTS FILLED FOR TABLE %d, RECHECKING CAPACITY\n",KCYN,table->idx);
@@ -227,6 +241,9 @@ void * student_thread(void* args)
     Student * student = (Student*)args;
     int arrival_time = rand()%10;
     sleep(arrival_time);
+    pthread_mutex_lock(&(waiting_mutex));
+    waiting_students++;
+    pthread_mutex_unlock(&(waiting_mutex));
     printf("%sSTUDENT %d HAS ARRIVED AND IS WAITING FOR SLOT\n",KYEL,student->idx);
     wait_for_slot(student->idx);
     return NULL;
@@ -258,6 +275,9 @@ void wait_for_slot(int idx)
 
 void student_in_slot(int i, int idx)
 {
+    pthread_mutex_lock(&(waiting_mutex));
+    waiting_students--;
+    pthread_mutex_unlock(&(waiting_mutex));
     printf("%sSTUDENT %d WAITING FOR SLOT AT TABLE %d\n",KRED,idx, i+1);
     printf("%sSTUDENT %d EATING AT TABLE %d\n",KGRN,idx, i+1);
     pthread_cond_signal(&(tables[i].cv_student));
