@@ -32,6 +32,7 @@ int * shared_mem(ll n)
         perror("shmat"); _exit(1);
     } 
 
+     printf("Enter array elements:\n");
     for(int i=0; i <n; i++) 
         scanf("%d", &arr[i]);
 
@@ -194,7 +195,9 @@ void *quicksort_threads(void *a)
 
 int main()
 {
-    ll n; scanf("%lld", &n);
+    ll n; 
+    printf("Enter number of elements:\n");
+    scanf("%lld", &n);
     int *arr = shared_mem(n);
     int *brr = (int*) malloc((n+5) * sizeof(int));
     int *crr = (int*) malloc((n+5) * sizeof(int));
