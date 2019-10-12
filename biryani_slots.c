@@ -102,14 +102,8 @@ int main()
 	for(int i=0; i < no_students; i++)
 		pthread_join(students[i].student_thread_id, 0);  
 
-    // for(int i=0; i < no_tables; i++)
-    // {
-    //     if(tables[i].occupancy > 0)
-    //     {
-    //         printf("%sTABLE %d SERVING\n",KCYN, i+1);
-    //     }
-    // }
-    printf("\n%sSimulation over!\n", KGR);
+    for(int i=0; i < no_tables; i++)
+        pthread_cancel(tables[i].table_thread_id);
 
     for(int i=0; i< no_chefs; i++)
 		pthread_mutex_destroy(&(chefs[i].chef_mutex));
@@ -117,7 +111,7 @@ int main()
     for(int i=0; i < no_tables; i++)
 		pthread_mutex_destroy(&(tables[i].table_mutex));
 
-	
+    printf("\n%sSimulation over!\n", KGR);
 	return 0; 
 }
 

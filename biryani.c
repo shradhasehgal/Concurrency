@@ -47,7 +47,6 @@ struct Table
 struct Student
 {
     int idx;
-    pthread_mutex_t student_mutex;
     pthread_t student_thread_id;
 };
 
@@ -66,7 +65,7 @@ int main()
     srand(time(0));
     printf("Enter number of chefs, tables, and students:\n");
     scanf("%d %d %d", &no_chefs, &no_tables, &no_students);
-    
+
     for(int i=0; i < no_chefs; i++)
     {
         chefs[i].idx = i+1;

@@ -26,23 +26,23 @@ struct Cab
 struct Rider
 {
 	int idx;
-	pthread_t rider_thread_id;
 	int arrivalTime;
 	int cabType;
 	int maxWaitTime;
 	int RideTime;
 	int cab_no;
-	sem_t payment;
 	int status;
+	sem_t payment;
+	pthread_t rider_thread_id;
 	pthread_mutex_t rider_mutex;
 };
 
 struct Server
 {
 	int idx;
-	pthread_t server_thread_id;
 	int status;
 	int rider_no;
+	pthread_t server_thread_id;
 };
 
 Cab Cabs[1000]; Rider riders[1000]; Server servers[1000];
@@ -78,8 +78,8 @@ int main()
 		riders[i].idx = i+1; 	
 		riders[i].arrivalTime = rand()%3; 
 		riders[i].cabType = rand()%2+1;
-		riders[i].maxWaitTime = rand()%10;
-		riders[i].RideTime = rand()%15;
+		riders[i].maxWaitTime = rand()%10 +1;
+		riders[i].RideTime = rand()%10;
 		sem_init(&(riders[i].payment), 0, 0); 
 		riders[i].status = 0;
 		pthread_mutex_init(&(riders[i].rider_mutex), NULL);
